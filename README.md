@@ -16,6 +16,26 @@ Which Mac do I have? Click the Apple menu, then "About This Mac". "Chip: Apple M
 
 All versions and what is new: [Releases](https://github.com/MademLuk/bratanic-releases/releases)
 
+## Play on a tablet (iPad or Android)
+
+Open **https://mademluk.github.io/bratanic-releases/** in Safari (iPad) or Chrome (Android), then **Add to Home Screen**.
+The game gets its own icon, opens full screen and plays with no internet. Nothing to install from a shop.
+
+**iPad (Safari):**
+1. Open https://mademluk.github.io/bratanic-releases/ in Safari and wait until the ship appears.
+2. Tap the **Share** button (a square with an arrow pointing up). If you do not see it, look in the **...** menu.
+3. Tap **Add to Home Screen**, then **Add**.
+4. From now on, start the game with the Bratanic icon on the Home Screen.
+
+**Android tablet (Chrome):**
+1. Open https://mademluk.github.io/bratanic-releases/ in Chrome and wait until the ship appears. The game may show an **Add to Home Screen** button: tap it.
+2. Or tap the menu (three dots, top right), then **Install app** or **Add to Home screen**.
+3. From now on, start the game with the Bratanic icon.
+
+**Progress** is saved on that tablet (it does not travel to other tablets or computers). Always start the game from the
+Home Screen icon, so the progress stays in one place. Removing the icon can also remove that progress.
+When the tablet is online, the game updates itself.
+
 ## Install on Windows
 
 1. Download the Setup file and open it. If your browser asks whether to keep the file, choose **Keep**.
@@ -44,6 +64,7 @@ It is installed when you close the game, or straight away if you click **Update 
 
 Progress is saved on your computer and stays when you update the game.
 Windows: in `%APPDATA%\The Bratanic Adventure`. Mac: in `~/Library/Application Support/The Bratanic Adventure`.
+Tablet: inside the game on that tablet (start it from the Home Screen icon).
 
 ## Need help?
 
