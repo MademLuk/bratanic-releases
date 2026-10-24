@@ -1595,7 +1595,7 @@ const GAME={
   paused:false,    // true while the big message card is open (or another card waits in line)
   subBusy:false,   // true while the submarine is being crushed or broken, until its card resets it (sub danger module)
   skyTint:0,       // 0..1 how dark and stormy the sky is at the camera (storm module)
-  version:'2.2.0', // shown in the menus; bump it for every release
+  version:'2.2.1', // shown in the menus; bump it for every release
   analog:{steer:0,thr:0,turn:0,vert:0}, // -1..1 from a game controller (INPUT module); added to the keys
   rumble:(strength,ms)=>{}, // controller vibration (INPUT module replaces it); strength 0..1
   onEscape:null,   // ()->true if it handled Esc / Start (SHELL module: pause menu)
@@ -2680,6 +2680,14 @@ function landMesh(ti,tj,f,skirt){const L=landGeo(ti,tj,f,skirt); if(!L)return nu
   m.tris=L.tris; m.verts=nv; return m;}
 function buildFull(T){const A=tilePoints(T.ti,T.tj,T.f,null,null), X=tileIndex(A.n); T.m=tileMesh(A,X.attr,true,null); FULLBUILT++;}
 function dropFull(T){shipScene.remove(T.m); T.m.geometry.dispose(); T.m=null;}
+/* after a lost WebGL context the copies on the graphics card are gone and the arrays were dropped after the upload:
+   make them again from the grid (the same deterministic builders, so the vertex order matches the indices) */
+function refill(g,A){const p=g.attributes.position,n=g.attributes.normal,c=g.attributes.color; p.array=A.P; n.array=A.N; c.array=A.Cc; p.needsUpdate=n.needsUpdate=c.needsUpdate=true;}
+GAME.refillTerrain=function(){
+  for(const T of TILES){if(T.ml){const L=landGeo(T.ti,T.tj,T.f,false); if(L)refill(T.ml.geometry,L.A);} if(T.mf){const L=landGeo(T.ti,T.tj,FARF,true); if(L)refill(T.mf.geometry,L.A);} if(T.m){dropFull(T); T.used=-1;}}
+  SECTORS.forEach((S,idx)=>{const parts=[]; for(let tj=0;tj<TNUM;tj++)for(let ti=0;ti<TNUM;ti++){const T=TILES[tj*TNUM+ti]; if(T.sec!==idx)continue; const L=landGeo(ti,tj,HZF,true); if(L)parts.push(L);}
+    const nv=S.verts, P=new Float32Array(nv*3), N=new Float32Array(nv*3), Cc=new Float32Array(nv*3); let o=0; for(const L of parts){P.set(L.A.P,o*3); N.set(L.A.N,o*3); Cc.set(L.A.Cc,o*3); o+=L.A.P.length/3;}
+    if(o===nv)refill(S.m.geometry,{P,N,Cc});});};
 (function(){
   for(let tj=0;tj<TNUM;tj++)for(let ti=0;ti<TNUM;ti++){const f=TLOD[tj*TNUM+ti]; let mx=-1e9,mn=1e9;
     for(let j=0;j<=CPT;j+=f)for(let i=0;i<=CPT;i+=f){const y=GRID.H[(tj*CPT+j)*GV+ti*CPT+i]; if(y>mx)mx=y; if(y<mn)mn=y;}
@@ -5251,7 +5259,7 @@ const STORMS=(function(){
   function limitOf(s){return EDGE-Math.min(s.r,700)*0.6;}
 
   function makeStorm(o,amb){
-    const s={id:nextId++,x:+o.x||0,z:+o.z||0,r:clampV(o.r==null?500:+o.r,80,2000),k:clampV(o.k==null?1:+o.k,0,1),
+    const s={id:nextId++,x:+o.x||0,z:+o.z||0,r:clampV(o.r==null?500:+o.r,80,2000),k:clampV(o.k==null?1:+o.k,0,1.6),
       vx:0,vz:0,level:!!o.level,kNow:0,slot:-1,dying:false,fadeRate:FADE,ambient:!!amb,
       hx:0,hz:0,hr:0,smin:2,smax:5,wa:R()*Math.PI*2,seed:R()*100,drift:false,nextStrike:lastT+2+R()*5};
     const lim=limitOf(s); s.x=clampV(s.x,-lim,lim); s.z=clampV(s.z,-lim,lim);
@@ -5952,8 +5960,7 @@ let count=0;
 try{const o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o){const f=String(o.found||''), s=String(o.seen||''); LET.forEach(l=>{l.found=f.includes(l.ch); l.seen=s.includes(l.ch)||l.found; l.gone=l.found;});}}catch(e){}
 count=LET.filter(l=>l.found).length;
 function save(){try{localStorage.setItem(KEY,JSON.stringify({found:LET.filter(l=>l.found).map(l=>l.ch).join(''),seen:LET.filter(l=>l.seen).map(l=>l.ch).join('')}));}catch(e){}}
-GAME.boost=()=>1+0.04*count;
-GAME.letterCount=()=>count;
+GAME.letterCount=()=>count; // CORE's GAME.boost reads it: +4% a letter
 
 /* ---------- the letters in the water ---------- */
 const FONT='"Big Shoulders Stencil Display","Arial Narrow",sans-serif', TS=TOUCH?192:256;
@@ -6456,7 +6463,7 @@ function spawnStorms(v){v.storms=0; const n=STORM_N[v.level]||0;
   const L=cum[cum.length-1];
   for(let k=0;k<n;k++){const p=pointAt(pts,cum,L*Math.min(0.92,(k+1)/(n+1)+(R()-0.5)*0.12)), nx=-p.tz, nz=p.tx, side=R()<0.5?-1:1;
     const off=side*(150+R()*300), x=THREE.MathUtils.clamp(p.x+nx*off,-EDGE+300,EDGE-300), z=THREE.MathUtils.clamp(p.z+nz*off,-EDGE+300,EDGE-300);
-    const sp=4+R()*4, vx=-side*nx*sp, vz=-side*nz*sp, r=360+R()*220, kk=0.6+0.3*R()+0.02*v.level;
+    const sp=4+R()*4, vx=-side*nx*sp, vz=-side*nz*sp, r=360+R()*220, kk=(v.level>=5&&k===0)?1.25+0.15*R():0.6+0.3*R()+0.02*v.level; // the hardest voyages get one hurricane (strength above 1: a calm eye in the middle)
     try{STORMS.add({x,z,r,radius:r,k:kk,strength:kk,vx,vz,speed:sp,dir:Math.atan2(vz,vx),level:true}); v.storms++;}catch(e){console.error(e);}}}
 
 /* =========================================================
@@ -6725,6 +6732,8 @@ function lose(v){v.state='lost'; v.timeLeft=0; setTel(3,true); sadSnd(); retryId
     {label:'Sail freely',onClick:()=>fadeSwap(()=>{GAME.resetShip(); retryNote=null; say('Back at the start. Press Voyages when you want to try again!',6);})}]});}
 // the ship goes back to the start (after sinking, or Start again): the voyage ends; if it was still going, offer it again
 GAME.resetters.push(()=>{const v=cur; if(v&&(v.state==='run'||v.state==='lost')){retryId=v.id; retryNote=v.name;} endVoyage();});
+// Settings > Start fresh: forget the medals and times too (in memory and saved), so a later win does not bring the old ones back
+GAME.resetVoyages=()=>{for(const k in records)delete records[k]; retryId=null; retryNote=null; save(KEY_V,records);};
 
 /* the clock, the finish line, and the slow work of building the route grid */
 GAME.tickers.push((t,dt)=>{
@@ -7106,12 +7115,14 @@ GAME.debug.endVoyage=()=>{endVoyage(); return true;};
     if(GAME.paused){if(panicOn&&SH.tel!==telSeen)cardTel=true; telSeen=SH.tel; return;}
     if(panicOn&&SH.tel!==telSeen)cardTel=false; telSeen=SH.tel;  // the captain moved the order machine himself
     if(panicOn){const dy=SH.yaw-yawPrev; turnAcc+=Math.abs(Math.atan2(Math.sin(dy),Math.cos(dy)));} yawPrev=SH.yaw;
-    let best=null, bestA=1e9; const dir=travelDir();
-    if(dir){
-      const c=Math.cos(SH.yaw)*dir, s=Math.sin(SH.yaw)*dir;   // look the way the ship is moving
+    let best=null, bestA=1e9; const dir=travelDir(); let c=0, s=0, look=false, pad=9;
+    if(dir){c=Math.cos(SH.yaw)*dir; s=Math.sin(SH.yaw)*dir; look=true;}   // look the way the ship is moving
+    else {const w=GAME.windAt(SH.x,SH.z), wl=Math.hypot(w[0],w[1]);       // stopped, but a storm wind pushes the ship: look where it drifts (it may be broadside, so a wider margin)
+      if(wl>1.2){c=w[0]/wl; s=-w[1]/wl; look=true; pad=56;}}
+    if(look){
       for(let i=0;i<BERGS.length;i++){const b=BERGS[i], rx=b.x-SH.x, rz=b.z-SH.z, along=rx*c-rz*s;
         if(along<=0||along>=NEAR)continue;
-        if(Math.abs(rx*s+rz*c)<b.R+9&&along<bestA){best=b; bestA=along;}}
+        if(Math.abs(rx*s+rz*c)<b.R+pad&&along<bestA){best=b; bestA=along;}}
     }
     if(best){dangerBerg=best; dangerAlong=bestA; clearT=0;
       if(!panicOn){panicOn=true; screamAcc=0.7; bubAcc=2.2; lookT=0; turnAcc=0; dir0=dir; cardTel=false;
@@ -7126,7 +7137,7 @@ GAME.debug.endVoyage=()=>{endVoyage(); return true;};
     if(gone||drive!=='ship')return;               // the iceberg went away, or nobody is at the wheel: nothing to say
     if(dir!==dir0&&cardTel)return;                // a menu stopped the ship (the captain did not): nothing to praise
     // say what really happened: stopped (or backed away), steered away, or just slipped past
-    tell(dir!==dir0?'Phew! The ship stopped in time.':(turnAcc>0.08?'Phew! Well steered, captain!':'Phew! That was close!'),4);
+    tell(dir!==dir0?(dir0?'Phew! The ship stopped in time.':'Phew! Well done, captain!'):(turnAcc>0.08?'Phew! Well steered, captain!':'Phew! That was close!'),4);
   }
 
   /* storm panic: a giant wave or lightning (GAME.panicNow), or a very strong storm at the ship (light panic) */
@@ -7723,6 +7734,8 @@ function findHomes(){const homes=[];
   for(const id of ['polar','cape','newyork']){const l=LANDMARKS.find(q=>q.id===id); if(!l)continue; const s=circleSpot(l.dock[0],l.dock[1],-42,0); if(s){s.name=l.name; homes.push(s);}}
   const tr=DEEP_PLACES.find(d=>d.id==='trench'&&d.path);
   if(tr){const s=trenchSpot(tr); if(s){s.name=tr.name; homes.push(s);}}
+  const ab=DEEP_PLACES.find(d=>d.id==='abyss'&&d.center);
+  if(ab){const s=circleSpot(ab.center[0],ab.center[1],-60,3); if(s){s.name=ab.name; homes.push(s);}}
   homes.forEach(h=>{h.ca=Math.cos(h.al); h.sa=Math.sin(h.al); h.lead=50/((h.a+h.b)/2);});
   return homes;}
 const PT={x:0,z:0};
@@ -7744,6 +7757,7 @@ function makeShark(home,i){
     x:0,y:home.y,z:0,yaw:0,pitch:0,speed:6,vy:0,turn:0,state:'patrol',st:0,bit:false,jawOpen:0.12,pingT:-99,vis:true,best:1e9,calm:0,esc:0,avT:0,avS:1,blk:false};
   placeOnPath(s,0); g.position.set(s.x,s.y,s.z); g.rotation.set(0,s.yaw,0); sharks.push(s); return s;}
 findHomes().forEach((h,i)=>makeShark(h,i));
+if(Array.isArray(GAME.dangerChecks))GAME.dangerChecks.push(()=>!!lost||P>=40||sharks.some(s=>s.state==='chase'||s.state==='bite')); // a chase, a bite or high pressure: not a safe moment
 
 function steer(s,tx,ty,tz,spd,maxTurn,dt){
   let dx=tx-s.x, dz=tz-s.z; const l=Math.hypot(dx,dz)||1; dx/=l; dz/=l;
@@ -8515,6 +8529,11 @@ GAME.debug.gpShake=v=>{shake=v; return shake;};
 const KEY='bratanic.settings.v1', VER=String(GAME.version||'');
 const DESK=window.bratanicDesktop&&typeof window.bratanicDesktop==='object'?window.bratanicDesktop:null; // the desktop app (Electron), if any
 const CHANGELOG=[
+ {v:'2.2.1', t:'Hurricanes and a shark in the Blue Abyss', items:[
+  'The hardest voyages bring a hurricane: a storm so strong it has a calm eye in the middle.',
+  'A huge shark now patrols the Blue Abyss too.',
+  'The passengers also panic when a stopped ship drifts towards an iceberg in a storm.',
+  'The game keeps going if your phone or tablet pauses it for a while.']},
  {v:'2.2.0', t:'A bigger sea and ocean currents', items:[
   'A much bigger sea, with the coasts of America, Europe and Africa, icy fjords and river deltas.',
   'Ocean currents: ride them to sail faster, or fight them!',
@@ -9110,19 +9129,21 @@ function loop(){
     gulls.forEach(q=>{q.a+=dt*q.s; q.g.position.set(SH.x+q.cx+Math.cos(q.a)*q.r,q.h+Math.sin(q.a*2)*2,SH.z+Math.sin(q.a)*q.r); q.g.rotation.y=-q.a+(q.s>0?-Math.PI/2:Math.PI/2)+Math.PI/2; const f=Math.sin(t*6+q.r)*0.5; q.wl.rotation.x=f; q.wr.rotation.x=-f;});
     shipAnims.forEach(fn=>fn(t,dt));
     const shipVis=ship.visible; if(shipFar)ship.visible=false;
-    camera.position.add(shakeV); renderer.render(shipScene,camera); camera.position.sub(shakeV); ship.visible=shipVis;
+    camera.position.add(shakeV); try{renderer.render(shipScene,camera);}catch(e){if(!loop.err){loop.err=true; console.error(e);}} camera.position.sub(shakeV); ship.visible=shipVis; // one bad frame (a lost context) must not stop the game
     const w=window.innerWidth,h=window.innerHeight;
     pins.forEach(p=>{tmp.copy(p.v).applyMatrix4(ship.matrixWorld).project(camera); const vis=!drive&&showPins&&!busy()&&tmp.z<1&&Math.abs(tmp.x)<1.05&&Math.abs(tmp.y)<1.05; p.el.hidden=!vis; if(vis)p.el.style.transform=`translate(${(tmp.x*0.5+0.5)*w}px,${(-tmp.y*0.5+0.5)*h}px)`;});
   } else {
     const b=active.bounds;
     camera.position.x=THREE.MathUtils.clamp(camera.position.x,-b[0],b[0]); camera.position.y=THREE.MathUtils.clamp(camera.position.y,0.2,b[1]); camera.position.z=THREE.MathUtils.clamp(camera.position.z,-b[2],b[2]);
     active.anims.forEach(fn=>fn(t,dt));
-    renderer.render(active.scene,camera);
+    try{renderer.render(active.scene,camera);}catch(e){if(!loop.err){loop.err=true; console.error(e);}}
   }
   if(first){first=false; $('loader').classList.add('gone');}
   requestAnimationFrame(loop);
 }
 setNight(false);
+/* a lost graphics context (a phone switching apps, a sleeping laptop): three.js restores it, and the world's terrain and sky need their data back */
+canvas.addEventListener('webglcontextrestored',()=>{try{if(GAME.refillTerrain)GAME.refillTerrain();}catch(e){console.error(e);} try{rebuildEnv();}catch(e){console.error(e);}},false);
 loop();
 } // start
 })();
