@@ -5,7 +5,7 @@
    A new version or build gets a new cache name; the old copies are deleted when the new one takes over. */
 'use strict';
 var VERSION = '2.2.1';
-var BUILD = 'd3d09b30d9';
+var BUILD = '51125bb2c8';
 var PREFIX = 'bratanic-adventure-web-';
 var CACHE = PREFIX + 'v' + VERSION + '-' + BUILD;
 var PAGE = 'index.html';
