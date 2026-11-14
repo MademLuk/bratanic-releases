@@ -1,7 +1,7 @@
 # The Bratanic Adventure
 
 A 3D game about a big ocean liner, the Bratanic, and its little submarine, designed by a young ship builder.
-Made for family and friends. Current version: **2.2.1**
+Made for family and friends. Current version: **2.5.0**
 
 ## Download
 
